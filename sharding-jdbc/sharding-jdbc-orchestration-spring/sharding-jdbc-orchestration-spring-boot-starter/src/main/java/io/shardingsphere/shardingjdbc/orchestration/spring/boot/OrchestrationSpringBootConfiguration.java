@@ -19,6 +19,7 @@ package io.shardingsphere.shardingjdbc.orchestration.spring.boot;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
+import io.shardingsphere.core.constant.ShardingConstant;
 import io.shardingsphere.core.exception.ShardingException;
 import io.shardingsphere.core.rule.ShardingRule;
 import io.shardingsphere.orchestration.internal.OrchestrationFacade;
@@ -33,7 +34,7 @@ import io.shardingsphere.shardingjdbc.orchestration.spring.boot.orchestration.Sp
 import io.shardingsphere.shardingjdbc.orchestration.spring.boot.sharding.SpringBootShardingRuleConfigurationProperties;
 import io.shardingsphere.shardingjdbc.orchestration.spring.boot.util.PropertyUtil;
 import io.shardingsphere.shardingjdbc.util.DataSourceUtil;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.EnvironmentAware;
 import org.springframework.context.annotation.Bean;
@@ -43,6 +44,7 @@ import org.springframework.util.StringUtils;
 
 import javax.sql.DataSource;
 import java.sql.SQLException;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -57,24 +59,20 @@ import java.util.Map;
         SpringBootShardingRuleConfigurationProperties.class, SpringBootMasterSlaveRuleConfigurationProperties.class,
         SpringBootConfigMapConfigurationProperties.class, SpringBootPropertiesConfigurationProperties.class, 
         SpringBootOrchestrationConfigurationProperties.class})
+@RequiredArgsConstructor
 public class OrchestrationSpringBootConfiguration implements EnvironmentAware {
     
     private final Map<String, DataSource> dataSourceMap = new LinkedHashMap<>();
     
-    @Autowired
-    private SpringBootShardingRuleConfigurationProperties shardingProperties;
+    private final SpringBootShardingRuleConfigurationProperties shardingProperties;
     
-    @Autowired
-    private SpringBootMasterSlaveRuleConfigurationProperties masterSlaveProperties;
+    private final SpringBootMasterSlaveRuleConfigurationProperties masterSlaveProperties;
     
-    @Autowired
-    private SpringBootConfigMapConfigurationProperties configMapProperties;
+    private final SpringBootConfigMapConfigurationProperties configMapProperties;
     
-    @Autowired
-    private SpringBootPropertiesConfigurationProperties propProperties;
+    private final SpringBootPropertiesConfigurationProperties propProperties;
     
-    @Autowired
-    private SpringBootOrchestrationConfigurationProperties orchestrationProperties;
+    private final SpringBootOrchestrationConfigurationProperties orchestrationProperties;
     
     /**
      * Get data source bean.
@@ -85,7 +83,7 @@ public class OrchestrationSpringBootConfiguration implements EnvironmentAware {
     @Bean
     public DataSource dataSource() throws SQLException {
         Preconditions.checkState(isValidConfiguration(), "The orchestration configuration is invalid, please choose one from Sharding rule and Master-slave rule.");
-        return isSharding() ? createShardingDataSource() : createMasterSlaveDataSource();
+        return isShardingRule() ? createShardingDataSource() : createMasterSlaveDataSource();
     }
     
     private boolean isValidConfiguration() {
@@ -101,22 +99,19 @@ public class OrchestrationSpringBootConfiguration implements EnvironmentAware {
         return !Strings.isNullOrEmpty(orchestrationProperties.getName());
     }
     
-    private boolean isSharding() {
-        return isValidRuleConfiguration() ? isShardingByLocal() : isShardingByRegistry();
+    private boolean isShardingRule() {
+        return isValidRuleConfiguration() ? isShardingRuleByLocal() : isShardingRuleByRegistry();
     }
     
-    private boolean isShardingByLocal() {
+    private boolean isShardingRuleByLocal() {
         return !shardingProperties.getTables().isEmpty();
     }
     
-    private boolean isShardingByRegistry() {
-        // TODO add get type in OrchestrationFacade & ConfigService
-        try (OrchestrationFacade orchestrationFacade = new OrchestrationFacade(orchestrationProperties.getOrchestrationConfiguration())) {
-            orchestrationFacade.getConfigService().loadShardingRuleConfiguration();
-        } catch (final Exception ex) {
-            return false;
+    private boolean isShardingRuleByRegistry() {
+        try (OrchestrationFacade orchestrationFacade = new OrchestrationFacade(
+                orchestrationProperties.getOrchestrationConfiguration(), Collections.singletonList(ShardingConstant.LOGIC_SCHEMA_NAME))) {
+            return orchestrationFacade.getConfigService().isShardingRule(ShardingConstant.LOGIC_SCHEMA_NAME);
         }
-        return true;
     }
     
     private DataSource createShardingDataSource() throws SQLException {

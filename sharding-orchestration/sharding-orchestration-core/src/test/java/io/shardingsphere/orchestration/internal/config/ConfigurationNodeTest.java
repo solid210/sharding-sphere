@@ -38,12 +38,17 @@ public final class ConfigurationNodeTest {
     }
     
     @Test
+    public void assertGetAuthenticationPath() {
+        assertThat(configurationNode.getAuthenticationPath(), is("/test/config/authentication"));
+    }
+    
+    @Test
     public void assertGetConfigMapPath() {
-        assertThat(configurationNode.getConfigMapPath(ShardingConstant.LOGIC_SCHEMA_NAME), is("/test/config/sharding_db/configmap"));
+        assertThat(configurationNode.getConfigMapPath(), is("/test/config/configmap"));
     }
     
     @Test
     public void assertGetPropsPath() {
-        assertThat(configurationNode.getPropsPath(ShardingConstant.LOGIC_SCHEMA_NAME), is("/test/config/sharding_db/props"));
+        assertThat(configurationNode.getPropsPath(), is("/test/config/props"));
     }
 }

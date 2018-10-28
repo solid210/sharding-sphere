@@ -29,21 +29,17 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public final class ConfigurationNode {
     
-    @Deprecated
-    public static final String PROXY_NODE = "proxy";
-    
     private static final String ROOT = "config";
     
     private static final String DATA_SOURCE_NODE = "datasource";
     
     private static final String RULE_NODE = "rule";
     
+    private static final String AUTHENTICATION_NODE = "authentication";
+    
     private static final String CONFIG_MAP_NODE = "configmap";
     
     private static final String PROPS_NODE = "props";
-    
-    @Deprecated
-    private static final String SERVER_NODE = "server";
     
     private final String name;
     
@@ -68,31 +64,46 @@ public final class ConfigurationNode {
     }
     
     /**
+     * Get authentication path.
+     *
+     * @return authentication path
+     */
+    public String getAuthenticationPath() {
+        return getFullPath(AUTHENTICATION_NODE);
+    }
+    
+    /**
      * Get config map path.
      *
-     * @param schemaName schema name
      * @return config map path
      */
-    public String getConfigMapPath(final String schemaName) {
-        return getFullPath(schemaName, CONFIG_MAP_NODE);
+    public String getConfigMapPath() {
+        return getFullPath(CONFIG_MAP_NODE);
     }
     
     /**
      * Get props path.
      *
-     * @param schemaName schema name
      * @return props path
      */
-    public String getPropsPath(final String schemaName) {
-        return getFullPath(schemaName, PROPS_NODE);
+    public String getPropsPath() {
+        return getFullPath(PROPS_NODE);
     }
     
-    @Deprecated
-    public String getServerPath(final String schemaName) {
-        return getFullPath(schemaName, SERVER_NODE);
+    /**
+     * Get root path.
+     * 
+     * @return root path
+     */
+    public String getRootPath() {
+        return Joiner.on("/").join("", name, ROOT);
     }
     
     private String getFullPath(final String schemaName, final String node) {
         return Joiner.on("/").join("", name, ROOT, schemaName, node);
+    }
+    
+    private String getFullPath(final String node) {
+        return Joiner.on("/").join("", name, ROOT, node);
     }
 }
