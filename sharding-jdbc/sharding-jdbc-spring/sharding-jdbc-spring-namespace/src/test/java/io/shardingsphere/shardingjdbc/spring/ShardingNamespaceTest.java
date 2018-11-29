@@ -50,6 +50,7 @@ import javax.sql.DataSource;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.Map;
 
 import static org.hamcrest.CoreMatchers.instanceOf;
@@ -213,13 +214,28 @@ public class ShardingNamespaceTest extends AbstractJUnit4SpringContextTests {
     }
     
     @Test
+    public void assertBroadcastTableRuleDatasource() {
+        ShardingRule shardingRule = getShardingRule("broadcastTableRuleDatasource");
+        assertThat(shardingRule.getBroadcastTables().size(), is(1));
+        assertThat(shardingRule.getBroadcastTables().iterator().next(), is("t_config"));
+    }
+    
+    @Test
+    public void assertMultiBroadcastTableRulesDatasource() {
+        ShardingRule shardingRule = getShardingRule("multiBroadcastTableRulesDatasource");
+        assertThat(shardingRule.getBroadcastTables().size(), is(2));
+        assertThat(((LinkedList<String>) shardingRule.getBroadcastTables()).get(0), is("t_config1"));
+        assertThat(((LinkedList<String>) shardingRule.getBroadcastTables()).get(1), is("t_config2"));
+    }
+    
+    @Test
     public void assertPropsDataSource() {
         ShardingDataSource shardingDataSource = applicationContext.getBean("propsDataSource", ShardingDataSource.class);
         Map<String, Object> configMap = new HashMap<>();
         configMap.put("key1", "value1");
         assertThat(ConfigMapContext.getInstance().getConfigMap(), is(configMap));
         ShardingContext shardingContext = (ShardingContext) FieldValueUtil.getFieldValue(shardingDataSource, "shardingContext", true);
-        assertTrue(shardingContext.isShowSQL());
+        assertTrue(shardingContext.getShardingProperties().<Boolean>getValue(ShardingPropertiesConstant.SQL_SHOW));
         ShardingProperties shardingProperties = shardingContext.getShardingProperties();
         boolean showSql = shardingProperties.getValue(ShardingPropertiesConstant.SQL_SHOW);
         assertTrue(showSql);

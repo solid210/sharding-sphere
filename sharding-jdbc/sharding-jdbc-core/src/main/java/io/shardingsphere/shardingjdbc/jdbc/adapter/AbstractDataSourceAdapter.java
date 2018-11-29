@@ -21,6 +21,8 @@ import com.google.common.base.Preconditions;
 import io.shardingsphere.core.bootstrap.ShardingBootstrap;
 import io.shardingsphere.core.constant.DatabaseType;
 import io.shardingsphere.shardingjdbc.jdbc.unsupported.AbstractUnsupportedOperationDataSource;
+import io.shardingsphere.spi.transaction.xa.DataSourceMapConverter;
+import io.shardingsphere.spi.transaction.xa.SPIDataSourceMapConverter;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -38,6 +40,7 @@ import java.util.logging.Logger;
  * 
  * @author zhangliang
  * @author panjuan
+ * @author zhaojun
  */
 @Getter
 @Setter
@@ -47,16 +50,20 @@ public abstract class AbstractDataSourceAdapter extends AbstractUnsupportedOpera
         ShardingBootstrap.init();
     }
     
-    @Getter
     private final Map<String, DataSource> dataSourceMap;
     
     private final DatabaseType databaseType;
+    
+    private final Map<String, DataSource> xaDataSourceMap;
+    
+    private final DataSourceMapConverter dataSourceMapConverter = new SPIDataSourceMapConverter();
     
     private PrintWriter logWriter = new PrintWriter(System.out);
     
     public AbstractDataSourceAdapter(final Map<String, DataSource> dataSourceMap) throws SQLException {
         this.dataSourceMap = dataSourceMap;
         databaseType = getDatabaseType(dataSourceMap.values());
+        xaDataSourceMap = dataSourceMapConverter.convert(dataSourceMap, databaseType);
     }
     
     protected final DatabaseType getDatabaseType(final Collection<DataSource> dataSources) throws SQLException {
@@ -78,15 +85,11 @@ public abstract class AbstractDataSourceAdapter extends AbstractUnsupportedOpera
         }
     }
     
-    @Override
+    /**
+     * Close original datasource.
+     */
     public void close() {
-        for (DataSource each : getDataSourceMap().values()) {
-            try {
-                Method closeMethod = each.getClass().getDeclaredMethod("close");
-                closeMethod.invoke(each);
-            } catch (final ReflectiveOperationException ignored) {
-            }
-        }
+        closeOriginalDataSources();
     }
     
     @Override
@@ -97,5 +100,36 @@ public abstract class AbstractDataSourceAdapter extends AbstractUnsupportedOpera
     @Override
     public final Connection getConnection(final String username, final String password) throws SQLException {
         return getConnection();
+    }
+    
+    private void closeOriginalDataSources() {
+        if (null != dataSourceMap) {
+            closeDataSource(dataSourceMap);
+        }
+        if (null != xaDataSourceMap) {
+            closeDataSource(xaDataSourceMap);
+        }
+    }
+    
+    private void closeDataSource(final Map<String, DataSource> dataSourceMap) {
+        for (DataSource each : dataSourceMap.values()) {
+            try {
+                findMethod(each, "close").invoke(each);
+            } catch (final ReflectiveOperationException ignored) {
+            }
+        }
+    }
+    
+    @SuppressWarnings("unchecked")
+    private Method findMethod(final Object target, final String methodName, final Class<?>... parameterTypes) throws NoSuchMethodException {
+        Class clazz = target.getClass();
+        while (null != clazz) {
+            try {
+                return clazz.getDeclaredMethod(methodName, parameterTypes);
+            } catch (NoSuchMethodException ignored) {
+            }
+            clazz = clazz.getSuperclass();
+        }
+        throw new NoSuchMethodException(String.format("Cannot find method '%s' in %s", methodName, target.getClass().getName()));
     }
 }

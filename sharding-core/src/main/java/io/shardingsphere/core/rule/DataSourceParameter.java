@@ -17,7 +17,6 @@
 
 package io.shardingsphere.core.rule;
 
-import io.shardingsphere.core.constant.PoolType;
 import io.shardingsphere.core.constant.transaction.ProxyPoolType;
 import lombok.Getter;
 import lombok.Setter;
@@ -31,7 +30,7 @@ import lombok.Setter;
 @Setter
 public final class DataSourceParameter {
     
-    private PoolType originPoolType;
+    public static final String DATA_SOURCE_POOL_CLASS_NAME = "com.zaxxer.hikari.HikariDataSource";
     
     private ProxyPoolType proxyDatasourceType = ProxyPoolType.VENDOR;
     

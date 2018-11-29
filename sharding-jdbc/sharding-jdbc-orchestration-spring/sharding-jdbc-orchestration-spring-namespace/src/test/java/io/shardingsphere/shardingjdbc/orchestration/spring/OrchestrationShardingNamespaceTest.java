@@ -41,6 +41,7 @@ import javax.sql.DataSource;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.Map;
 
 import static org.hamcrest.CoreMatchers.is;
@@ -136,6 +137,21 @@ public class OrchestrationShardingNamespaceTest extends AbstractJUnit4SpringCont
     }
     
     @Test
+    public void assertBroadcastTableRuleDatasource() {
+        ShardingRule shardingRule = getShardingRule("broadcastTableRuleDatasourceOrchestration");
+        assertThat(shardingRule.getBroadcastTables().size(), is(1));
+        assertThat(shardingRule.getBroadcastTables().iterator().next(), is("t_config"));
+    }
+    
+    @Test
+    public void assertMultiBroadcastTableRulesDatasource() {
+        ShardingRule shardingRule = getShardingRule("multiBroadcastTableRulesDatasourceOrchestration");
+        assertThat(shardingRule.getBroadcastTables().size(), is(2));
+        assertThat(((LinkedList<String>) shardingRule.getBroadcastTables()).get(0), is("t_config1"));
+        assertThat(((LinkedList<String>) shardingRule.getBroadcastTables()).get(1), is("t_config2"));
+    }
+    
+    @Test
     public void assertPropsDataSource() {
         OrchestrationSpringShardingDataSource shardingDataSource = applicationContext.getBean("propsDataSourceOrchestration", OrchestrationSpringShardingDataSource.class);
         ShardingDataSource dataSource = (ShardingDataSource) FieldValueUtil.getFieldValue(shardingDataSource, "dataSource", true);
@@ -143,7 +159,7 @@ public class OrchestrationShardingNamespaceTest extends AbstractJUnit4SpringCont
         configMap.put("key1", "value1");
         assertThat(ConfigMapContext.getInstance().getConfigMap(), is(configMap));
         ShardingContext shardingContext = (ShardingContext) FieldValueUtil.getFieldValue(dataSource, "shardingContext", false);
-        assertTrue(shardingContext.isShowSQL());
+        assertTrue(shardingContext.getShardingProperties().<Boolean>getValue(ShardingPropertiesConstant.SQL_SHOW));
         ShardingProperties shardingProperties = shardingContext.getShardingProperties();
         boolean showSql = shardingProperties.getValue(ShardingPropertiesConstant.SQL_SHOW);
         assertTrue(showSql);

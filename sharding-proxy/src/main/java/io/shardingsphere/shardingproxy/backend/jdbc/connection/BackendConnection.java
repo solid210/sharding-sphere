@@ -17,21 +17,27 @@
 
 package io.shardingsphere.shardingproxy.backend.jdbc.connection;
 
+import com.google.common.collect.LinkedHashMultimap;
+import com.google.common.collect.Multimap;
+import io.netty.channel.ChannelHandlerContext;
 import io.shardingsphere.core.constant.ConnectionMode;
+import io.shardingsphere.core.constant.transaction.TransactionType;
 import io.shardingsphere.core.routing.router.masterslave.MasterVisitedManager;
 import io.shardingsphere.shardingproxy.runtime.schema.LogicSchema;
 import lombok.Getter;
-import lombok.NoArgsConstructor;
 import lombok.Setter;
+import lombok.extern.slf4j.Slf4j;
 
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Backend connection.
@@ -39,26 +45,82 @@ import java.util.concurrent.CopyOnWriteArrayList;
  * @author zhaojun
  * @author zhangliang
  */
-@NoArgsConstructor
+@Slf4j
+@Getter
 public final class BackendConnection implements AutoCloseable {
     
-    @Getter
-    @Setter
     private LogicSchema logicSchema;
     
-    private final Collection<Connection> cachedConnections = new CopyOnWriteArrayList<>();
+    private final Multimap<String, Connection> cachedConnections = LinkedHashMultimap.create();
     
     private final Collection<Statement> cachedStatements = new CopyOnWriteArrayList<>();
     
     private final Collection<ResultSet> cachedResultSets = new CopyOnWriteArrayList<>();
     
+    private final Collection<MethodInvocation> methodInvocations = new ArrayList<>();
+    
+    private volatile AtomicReference<ConnectionStatus> status = new AtomicReference<>(ConnectionStatus.INIT);
+    
+    private TransactionType transactionType;
+    
+    @Setter
+    private ChannelHandlerContext context;
+    
+    private final Object lock = new Object();
+    
+    public BackendConnection(final TransactionType transactionType) {
+        this.transactionType = transactionType;
+    }
+    
     /**
-     * Get connection size.
-     * 
-     * @return connection size
+     * Change connection status using compare and set.
+     *
+     * @param expect expect status
+     * @param update new update status
+     * @return boolean set succeed or failed
      */
-    public int getConnectionSize() {
-        return cachedConnections.size();
+    public boolean compareAndSetStatus(final ConnectionStatus expect, final ConnectionStatus update) {
+        return status.compareAndSet(expect, update);
+    }
+    
+    /**
+     * Change connection status using get and set.
+     *
+     * @param update new update status
+     */
+    public void getAndSetStatus(final ConnectionStatus update) {
+        status.getAndSet(update);
+    }
+    
+    /**
+     * Get current connection status.
+     *
+     * @return connection status
+     */
+    public ConnectionStatus getStatus() {
+        return status.get();
+    }
+    
+    /**
+     * Change transaction type of current channel.
+     *
+     * @param transactionType transaction type
+     */
+    public void setTransactionType(final TransactionType transactionType) {
+        if (ConnectionStatus.TRANSACTION != status.get()) {
+            this.transactionType = transactionType;
+        }
+    }
+    
+    /**
+     * Change logic schema of current channel.
+     *
+     * @param logicSchema logic schema
+     */
+    public void setLogicSchema(final LogicSchema logicSchema) {
+        if (ConnectionStatus.TRANSACTION != status.get()) {
+            this.logicSchema = logicSchema;
+        }
     }
     
     /**
@@ -71,9 +133,62 @@ public final class BackendConnection implements AutoCloseable {
      * @throws SQLException SQL exception
      */
     public List<Connection> getConnections(final ConnectionMode connectionMode, final String dataSourceName, final int connectionSize) throws SQLException {
-        List<Connection> result = logicSchema.getBackendDataSource().getConnections(connectionMode, dataSourceName, connectionSize);
-        cachedConnections.addAll(result);
+        if (ConnectionStatus.INIT == status.get() || ConnectionStatus.TERMINATED == status.get()) {
+            status.getAndSet(ConnectionStatus.RUNNING);
+        }
+        if (ConnectionStatus.TRANSACTION == status.get()) {
+            return getConnectionsWithTransaction(connectionMode, dataSourceName, connectionSize);
+        } else {
+            return getConnectionsWithoutTransaction(connectionMode, dataSourceName, connectionSize);
+        }
+    }
+    
+    private List<Connection> getConnectionsWithTransaction(final ConnectionMode connectionMode, final String dataSourceName, final int connectionSize) throws SQLException {
+        Collection<Connection> connections;
+        synchronized (cachedConnections) {
+            connections = cachedConnections.get(dataSourceName);
+        }
+        List<Connection> result;
+        if (connections.size() >= connectionSize) {
+            result = new ArrayList<>(connections).subList(0, connectionSize);
+        } else if (!connections.isEmpty()) {
+            result = new ArrayList<>(connectionSize);
+            result.addAll(connections);
+            List<Connection> newConnections = createNewConnections(connectionMode, dataSourceName, connectionSize - connections.size());
+            result.addAll(newConnections);
+            synchronized (cachedConnections) {
+                cachedConnections.putAll(dataSourceName, newConnections);
+            }
+        } else {
+            result = createNewConnections(connectionMode, dataSourceName, connectionSize);
+            synchronized (cachedConnections) {
+                cachedConnections.putAll(dataSourceName, result);
+            }
+        }
         return result;
+    }
+    
+    private synchronized List<Connection> getConnectionsWithoutTransaction(final ConnectionMode connectionMode, final String dataSourceName, final int connectionSize) throws SQLException {
+        List<Connection> result = logicSchema.getBackendDataSource().getConnections(connectionMode, dataSourceName, connectionSize);
+        cachedConnections.putAll(dataSourceName, result);
+        return result;
+    }
+    
+    private List<Connection> createNewConnections(final ConnectionMode connectionMode, final String dataSourceName, final int connectionSize) throws SQLException {
+        List<Connection> result = logicSchema.getBackendDataSource().getConnections(connectionMode, dataSourceName, connectionSize);
+        for (Connection each : result) {
+            replayMethodsInvocation(each);
+        }
+        return result;
+    }
+    
+    /**
+     * Get connection size.
+     *
+     * @return connection size
+     */
+    public int getConnectionSize() {
+        return cachedConnections.values().size();
     }
     
     /**
@@ -94,25 +209,30 @@ public final class BackendConnection implements AutoCloseable {
         cachedResultSets.add(resultSet);
     }
     
-    /**
-     * Cancel statement.
-     */
-    public void cancel() {
-        for (Statement each : cachedStatements) {
-            try {
-                each.cancel();
-            } catch (final SQLException ignored) {
-            }
-        }
-    }
-    
     @Override
     public void close() throws SQLException {
+        close(false);
+    }
+    
+    /**
+     * Close cached connection.
+     *
+     * @param forceClose force close flag
+     * @throws SQLException SQL exception
+     */
+    public synchronized void close(final boolean forceClose) throws SQLException {
         Collection<SQLException> exceptions = new LinkedList<>();
-        exceptions.addAll(closeResultSets());
-        exceptions.addAll(closeStatements());
-        exceptions.addAll(closeConnections());
         MasterVisitedManager.clear();
+        exceptions.addAll(closeStatements());
+        exceptions.addAll(closeResultSets());
+        if (ConnectionStatus.TRANSACTION != status.get() || forceClose) {
+            exceptions.addAll(releaseConnections(forceClose));
+        }
+        if (status.compareAndSet(ConnectionStatus.RUNNING, ConnectionStatus.RELEASE)) {
+            synchronized (lock) {
+                lock.notifyAll();
+            }
+        }
         throwSQLExceptionIfNecessary(exceptions);
     }
     
@@ -125,6 +245,7 @@ public final class BackendConnection implements AutoCloseable {
                 result.add(ex);
             }
         }
+        cachedResultSets.clear();
         return result;
     }
     
@@ -137,18 +258,24 @@ public final class BackendConnection implements AutoCloseable {
                 result.add(ex);
             }
         }
+        cachedStatements.clear();
         return result;
     }
     
-    private Collection<SQLException> closeConnections() {
+    Collection<SQLException> releaseConnections(final boolean forceRollback) {
         Collection<SQLException> result = new LinkedList<>();
-        for (Connection each : cachedConnections) {
+        for (Connection each : cachedConnections.values()) {
             try {
+                if (forceRollback && ConnectionStatus.TRANSACTION == status.get()) {
+                    each.rollback();
+                }
                 each.close();
             } catch (SQLException ex) {
                 result.add(ex);
             }
         }
+        cachedConnections.clear();
+        methodInvocations.clear();
         return result;
     }
     
@@ -161,5 +288,11 @@ public final class BackendConnection implements AutoCloseable {
             ex.setNextException(each);
         }
         throw ex;
+    }
+    
+    private void replayMethodsInvocation(final Object target) {
+        for (MethodInvocation each : methodInvocations) {
+            each.invoke(target);
+        }
     }
 }
