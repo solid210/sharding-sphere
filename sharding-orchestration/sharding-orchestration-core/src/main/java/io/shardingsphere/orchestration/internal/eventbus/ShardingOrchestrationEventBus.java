@@ -15,19 +15,28 @@
  * </p>
  */
 
-package io.shardingsphere.orchestration.internal.state.event;
+package io.shardingsphere.orchestration.internal.eventbus;
 
-import lombok.Getter;
-import lombok.RequiredArgsConstructor;
+import com.google.common.eventbus.EventBus;
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
 
 /**
- * Circuit state event.
- *
- * @author panjuan
+ * Sharding orchestration event bus.
+ * 
+ * @author zhangliang
  */
-@RequiredArgsConstructor
-@Getter
-public final class CircuitStateEvent {
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
+public final class ShardingOrchestrationEventBus {
     
-    private final boolean isCircuitBreak;
+    private static final EventBus INSTANCE = new EventBus();
+    
+    /**
+     * Get instance of sharding orchestration event bus.
+     * 
+     * @return instance of sharding orchestration event bus
+     */
+    public static EventBus getInstance() {
+        return INSTANCE;
+    }
 }

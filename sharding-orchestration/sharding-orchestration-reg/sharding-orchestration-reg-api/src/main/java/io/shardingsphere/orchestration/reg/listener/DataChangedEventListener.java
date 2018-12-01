@@ -15,29 +15,19 @@
  * </p>
  */
 
-package io.shardingsphere.core.event.executor;
-
-import io.shardingsphere.core.event.ShardingEvent;
-import io.shardingsphere.core.metadata.datasource.DataSourceMetaData;
-import io.shardingsphere.core.routing.RouteUnit;
-import lombok.Getter;
-import lombok.RequiredArgsConstructor;
-
-import java.util.List;
+package io.shardingsphere.orchestration.reg.listener;
 
 /**
- * SQL execution event.
+ * Listener for data changed event.
  *
- * @author gaohongtao
- * @author maxiaoguang
+ * @author junxiong
  */
-@RequiredArgsConstructor
-@Getter
-public class SQLExecutionEvent extends ShardingEvent {
+public interface DataChangedEventListener {
     
-    private final RouteUnit routeUnit;
-    
-    private final List<Object> parameters;
-    
-    private final DataSourceMetaData dataSourceMetaData;
+    /**
+     * Fire when event changed.
+     * 
+     * @param event data changed event
+     */
+    void onChange(DataChangedEvent event);
 }

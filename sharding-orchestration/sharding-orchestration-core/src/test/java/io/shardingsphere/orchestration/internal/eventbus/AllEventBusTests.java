@@ -15,24 +15,13 @@
  * </p>
  */
 
-package io.shardingsphere.core.event.transaction.base;
+package io.shardingsphere.orchestration.internal.eventbus;
 
-import io.shardingsphere.core.event.ShardingEvent;
-import io.shardingsphere.core.routing.RouteUnit;
-import lombok.Getter;
-import lombok.RequiredArgsConstructor;
+import org.junit.runner.RunWith;
+import org.junit.runners.Suite;
+import org.junit.runners.Suite.SuiteClasses;
 
-/**
- * Saga SQL execution.
- *
- * @author yangyi
- */
-@Getter
-@RequiredArgsConstructor
-public final class SagaSQLExecutionEvent extends ShardingEvent {
-    
-    private final RouteUnit routeUnit;
-    
-    private final String transactionId;
-    
+@RunWith(Suite.class)
+@SuiteClasses(ShardingOrchestrationEventBusTest.class)
+public final class AllEventBusTests {
 }

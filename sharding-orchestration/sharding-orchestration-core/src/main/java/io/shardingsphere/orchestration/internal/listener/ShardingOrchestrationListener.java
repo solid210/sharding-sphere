@@ -15,18 +15,18 @@
  * </p>
  */
 
-package io.shardingsphere.shardingjdbc.util;
+package io.shardingsphere.orchestration.internal.listener;
 
-import io.shardingsphere.core.event.ShardingEventBusInstance;
-import org.junit.Test;
-
-import static org.hamcrest.CoreMatchers.is;
-import static org.junit.Assert.assertThat;
-
-public final class EventBusInstanceTest {
+/**
+ * Sharding orchestration listener.
+ *
+ * @author caohao
+ * @author panjuan
+ */
+public interface ShardingOrchestrationListener {
     
-    @Test
-    public void assertGetInstance() {
-        assertThat(ShardingEventBusInstance.getInstance(), is(ShardingEventBusInstance.getInstance()));
-    }
+    /**
+     * Start to watch.
+     */
+    void watch();
 }

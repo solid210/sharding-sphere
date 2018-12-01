@@ -15,18 +15,20 @@
  * </p>
  */
 
-package io.shardingsphere.orchestration.internal.listener;
+package io.shardingsphere.orchestration.internal.state.event;
+
+import io.shardingsphere.orchestration.internal.listener.ShardingOrchestrationEvent;
+import lombok.Getter;
+import lombok.RequiredArgsConstructor;
 
 /**
- * Orchestration listener.
+ * Circuit state event.
  *
- * @author caohao
  * @author panjuan
  */
-public interface OrchestrationListener {
+@RequiredArgsConstructor
+@Getter
+public final class CircuitStateChangedEvent implements ShardingOrchestrationEvent {
     
-    /**
-     * Start to watch.
-     */
-    void watch();
+    private final boolean isCircuitBreak;
 }

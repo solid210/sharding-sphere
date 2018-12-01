@@ -15,23 +15,12 @@
  * </p>
  */
 
-package io.shardingsphere.core.executor.fixture;
+package io.shardingsphere.orchestration.internal.listener;
 
-import io.shardingsphere.core.event.ShardingEventType;
-
-import java.util.List;
-
-public interface EventCaller {
-    
-    void verifyDataSource(String dataSource);
-    
-    void verifySQL(String sql);
-    
-    void verifyParameters(List<Object> parameters);
-    
-    void verifyEventExecutionType(ShardingEventType eventType);
-    
-    void verifyException(Exception exp);
-    
-    void verifyIsParallelExecute(boolean isParallelExecute);
+/**
+ * Sharding orchestration event.
+ *
+ * @author zhangliang
+ */
+public interface ShardingOrchestrationEvent {
 }

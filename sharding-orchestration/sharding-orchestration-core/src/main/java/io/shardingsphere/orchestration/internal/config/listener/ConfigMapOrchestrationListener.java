@@ -17,13 +17,17 @@
 
 package io.shardingsphere.orchestration.internal.config.listener;
 
+import com.google.common.base.Optional;
 import io.shardingsphere.api.ConfigMapContext;
 import io.shardingsphere.orchestration.internal.config.node.ConfigurationNode;
 import io.shardingsphere.orchestration.internal.config.service.ConfigurationService;
-import io.shardingsphere.orchestration.internal.listener.AbstractOrchestrationListener;
+import io.shardingsphere.orchestration.internal.listener.AbstractShardingOrchestrationListener;
+import io.shardingsphere.orchestration.internal.listener.PostShardingOrchestrationEventListener;
+import io.shardingsphere.orchestration.internal.listener.ShardingOrchestrationEvent;
 import io.shardingsphere.orchestration.reg.api.RegistryCenter;
 import io.shardingsphere.orchestration.reg.listener.DataChangedEvent;
-import io.shardingsphere.orchestration.reg.listener.EventListener;
+import io.shardingsphere.orchestration.reg.listener.DataChangedEvent.Type;
+import io.shardingsphere.orchestration.reg.listener.DataChangedEventListener;
 
 /**
  * Config map orchestration listener.
@@ -31,7 +35,7 @@ import io.shardingsphere.orchestration.reg.listener.EventListener;
  * @author caohao
  * @author panjuan
  */
-public final class ConfigMapOrchestrationListener extends AbstractOrchestrationListener {
+public final class ConfigMapOrchestrationListener extends AbstractShardingOrchestrationListener {
     
     private final ConfigurationService configService;
     
@@ -41,15 +45,18 @@ public final class ConfigMapOrchestrationListener extends AbstractOrchestrationL
     }
     
     @Override
-    protected EventListener getEventListener() {
-        return new EventListener() {
+    protected DataChangedEventListener getDataChangedEventListener() {
+        return new PostShardingOrchestrationEventListener() {
             
             @Override
-            public void onChange(final DataChangedEvent event) {
-                if (DataChangedEvent.Type.UPDATED == event.getEventType()) {
-                    ConfigMapContext.getInstance().getConfigMap().clear();
-                    ConfigMapContext.getInstance().getConfigMap().putAll(configService.loadConfigMap());
+            protected Optional<ShardingOrchestrationEvent> createOrchestrationEvent(final DataChangedEvent event) {
+                if (Type.UPDATED != event.getType()) {
+                    return Optional.absent();
                 }
+                // TODO use event
+                ConfigMapContext.getInstance().getConfigMap().clear();
+                ConfigMapContext.getInstance().getConfigMap().putAll(configService.loadConfigMap());
+                return Optional.absent();
             }
         };
     }

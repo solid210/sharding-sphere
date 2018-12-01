@@ -17,15 +17,18 @@
 
 package io.shardingsphere.orchestration.internal.state.listener;
 
-import io.shardingsphere.core.event.ShardingEventBusInstance;
-import io.shardingsphere.orchestration.internal.listener.AbstractOrchestrationListener;
-import io.shardingsphere.orchestration.internal.state.event.CircuitStateEvent;
+import com.google.common.base.Optional;
+import io.shardingsphere.orchestration.internal.listener.AbstractShardingOrchestrationListener;
+import io.shardingsphere.orchestration.internal.listener.PostShardingOrchestrationEventListener;
+import io.shardingsphere.orchestration.internal.listener.ShardingOrchestrationEvent;
+import io.shardingsphere.orchestration.internal.state.event.CircuitStateChangedEvent;
 import io.shardingsphere.orchestration.internal.state.instance.OrchestrationInstance;
 import io.shardingsphere.orchestration.internal.state.node.StateNode;
 import io.shardingsphere.orchestration.internal.state.node.StateNodeStatus;
 import io.shardingsphere.orchestration.reg.api.RegistryCenter;
 import io.shardingsphere.orchestration.reg.listener.DataChangedEvent;
-import io.shardingsphere.orchestration.reg.listener.EventListener;
+import io.shardingsphere.orchestration.reg.listener.DataChangedEvent.Type;
+import io.shardingsphere.orchestration.reg.listener.DataChangedEventListener;
 
 /**
  * Instance State orchestration listener.
@@ -33,7 +36,7 @@ import io.shardingsphere.orchestration.reg.listener.EventListener;
  * @author caohao
  * @author panjuan
  */
-public final class InstanceStateOrchestrationListener extends AbstractOrchestrationListener {
+public final class InstanceStateOrchestrationListener extends AbstractShardingOrchestrationListener {
     
     private final RegistryCenter regCenter;
     
@@ -43,18 +46,14 @@ public final class InstanceStateOrchestrationListener extends AbstractOrchestrat
     }
     
     @Override
-    protected EventListener getEventListener() {
-        return new EventListener() {
-    
+    protected DataChangedEventListener getDataChangedEventListener() {
+        return new PostShardingOrchestrationEventListener() {
+            
             @Override
-            public void onChange(final DataChangedEvent event) {
-                if (DataChangedEvent.Type.UPDATED == event.getEventType()) {
-                    if (StateNodeStatus.DISABLED.toString().equalsIgnoreCase(regCenter.get(event.getKey()))) {
-                        ShardingEventBusInstance.getInstance().post(new CircuitStateEvent(true));
-                    } else {
-                        ShardingEventBusInstance.getInstance().post(new CircuitStateEvent(false));
-                    }
-                }
+            protected Optional<ShardingOrchestrationEvent> createOrchestrationEvent(final DataChangedEvent event) {
+                return Type.UPDATED == event.getType()
+                        ? Optional.<ShardingOrchestrationEvent>of(new CircuitStateChangedEvent(StateNodeStatus.DISABLED.toString().equalsIgnoreCase(regCenter.get(event.getKey()))))
+                        : Optional.<ShardingOrchestrationEvent>absent();
             }
         };
     }

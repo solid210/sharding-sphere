@@ -15,19 +15,17 @@
  * </p>
  */
 
-package io.shardingsphere.orchestration.reg.listener;
+package io.shardingsphere.orchestration.internal.eventbus;
 
-/**
- * Coordinator registry event change listener.
- *
- * @author junxiong
- */
-public interface EventListener {
+import org.junit.Test;
+
+import static org.hamcrest.CoreMatchers.is;
+import static org.junit.Assert.assertThat;
+
+public final class ShardingOrchestrationEventBusTest {
     
-    /**
-     * Fire when event changed.
-     * 
-     * @param event data changed event
-     */
-    void onChange(DataChangedEvent event);
+    @Test
+    public void assertGetInstance() {
+        assertThat(ShardingOrchestrationEventBus.getInstance(), is(ShardingOrchestrationEventBus.getInstance()));
+    }
 }

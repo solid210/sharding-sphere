@@ -17,21 +17,24 @@
 
 package io.shardingsphere.orchestration.internal.config.listener;
 
-import io.shardingsphere.core.event.ShardingEventBusInstance;
+import com.google.common.base.Optional;
 import io.shardingsphere.orchestration.internal.config.event.PropertiesChangedEvent;
 import io.shardingsphere.orchestration.internal.config.node.ConfigurationNode;
 import io.shardingsphere.orchestration.internal.config.service.ConfigurationService;
-import io.shardingsphere.orchestration.internal.listener.AbstractOrchestrationListener;
+import io.shardingsphere.orchestration.internal.listener.AbstractShardingOrchestrationListener;
+import io.shardingsphere.orchestration.internal.listener.PostShardingOrchestrationEventListener;
+import io.shardingsphere.orchestration.internal.listener.ShardingOrchestrationEvent;
 import io.shardingsphere.orchestration.reg.api.RegistryCenter;
 import io.shardingsphere.orchestration.reg.listener.DataChangedEvent;
-import io.shardingsphere.orchestration.reg.listener.EventListener;
+import io.shardingsphere.orchestration.reg.listener.DataChangedEvent.Type;
+import io.shardingsphere.orchestration.reg.listener.DataChangedEventListener;
 
 /**
  * Properties orchestration listener.
  *
  * @author panjuan
  */
-public final class PropertiesOrchestrationListener extends AbstractOrchestrationListener {
+public final class PropertiesOrchestrationListener extends AbstractShardingOrchestrationListener {
     
     private final ConfigurationService configService;
     
@@ -41,14 +44,13 @@ public final class PropertiesOrchestrationListener extends AbstractOrchestration
     }
     
     @Override
-    protected EventListener getEventListener() {
-        return new EventListener() {
+    protected DataChangedEventListener getDataChangedEventListener() {
+        return new PostShardingOrchestrationEventListener() {
             
             @Override
-            public void onChange(final DataChangedEvent event) {
-                if (DataChangedEvent.Type.UPDATED == event.getEventType()) {
-                    ShardingEventBusInstance.getInstance().post(new PropertiesChangedEvent(configService.loadProperties()));
-                }
+            protected Optional<ShardingOrchestrationEvent> createOrchestrationEvent(final DataChangedEvent event) {
+                return Type.UPDATED == event.getType()
+                        ? Optional.<ShardingOrchestrationEvent>of(new PropertiesChangedEvent(configService.loadProperties())) : Optional.<ShardingOrchestrationEvent>absent();
             }
         };
     }

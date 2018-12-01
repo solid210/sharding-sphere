@@ -15,26 +15,21 @@
  * </p>
  */
 
-package io.shardingsphere.shardingjdbc.executor.fixture;
+package io.shardingsphere.orchestration.internal.state.event;
 
-import com.google.common.eventbus.AllowConcurrentEvents;
-import com.google.common.eventbus.Subscribe;
-import io.shardingsphere.core.event.executor.DQLExecutionEvent;
-import lombok.AllArgsConstructor;
+import io.shardingsphere.orchestration.internal.listener.ShardingOrchestrationEvent;
+import io.shardingsphere.orchestration.internal.state.schema.OrchestrationShardingSchemaGroup;
+import lombok.Getter;
+import lombok.RequiredArgsConstructor;
 
-@AllArgsConstructor
-public final class TestDQLExecutionEventListener {
+/**
+ * Disabled state event.
+ *
+ * @author panjuan
+ */
+@RequiredArgsConstructor
+@Getter
+public final class DisabledStateChangedEvent implements ShardingOrchestrationEvent {
     
-    private final EventCaller eventCaller;
-    
-    /**
-     * Listen event.
-     *
-     * @param event execution event
-     */
-    @Subscribe
-    @AllowConcurrentEvents
-    public void listen(final DQLExecutionEvent event) {
-        ExecutorTestUtil.listen(eventCaller, event);
-    }
+    private final OrchestrationShardingSchemaGroup disabledGroup;
 }
