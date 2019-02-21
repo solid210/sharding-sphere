@@ -20,11 +20,10 @@ package org.apache.shardingsphere.shardingproxy.transport.postgresql.packet.comm
 import com.google.common.base.Optional;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.shardingsphere.core.constant.DatabaseType;
 import org.apache.shardingsphere.shardingproxy.backend.ResultPacket;
 import org.apache.shardingsphere.shardingproxy.backend.communication.jdbc.connection.BackendConnection;
-import org.apache.shardingsphere.shardingproxy.backend.text.ComQueryBackendHandlerFactory;
 import org.apache.shardingsphere.shardingproxy.backend.text.TextProtocolBackendHandler;
+import org.apache.shardingsphere.shardingproxy.backend.text.TextProtocolBackendHandlerFactory;
 import org.apache.shardingsphere.shardingproxy.runtime.GlobalRegistry;
 import org.apache.shardingsphere.shardingproxy.transport.common.packet.DatabasePacket;
 import org.apache.shardingsphere.shardingproxy.transport.common.packet.command.CommandResponsePackets;
@@ -53,7 +52,7 @@ public final class PostgreSQLComQueryPacket implements PostgreSQLQueryCommandPac
     public PostgreSQLComQueryPacket(final PostgreSQLPacketPayload payload, final BackendConnection backendConnection) {
         payload.readInt4();
         sql = payload.readStringNul();
-        textProtocolBackendHandler = ComQueryBackendHandlerFactory.createTextProtocolBackendHandler(0, sql, backendConnection, DatabaseType.PostgreSQL);
+        textProtocolBackendHandler = TextProtocolBackendHandlerFactory.newInstance(sql, backendConnection);
     }
     
     @Override

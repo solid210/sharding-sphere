@@ -18,15 +18,14 @@
 package org.apache.shardingsphere.shardingproxy.backend.text.query;
 
 import lombok.RequiredArgsConstructor;
-import org.apache.shardingsphere.core.constant.DatabaseType;
 import org.apache.shardingsphere.shardingproxy.backend.ResultPacket;
 import org.apache.shardingsphere.shardingproxy.backend.communication.DatabaseCommunicationEngine;
 import org.apache.shardingsphere.shardingproxy.backend.communication.DatabaseCommunicationEngineFactory;
 import org.apache.shardingsphere.shardingproxy.backend.communication.jdbc.connection.BackendConnection;
 import org.apache.shardingsphere.shardingproxy.backend.text.TextProtocolBackendHandler;
+import org.apache.shardingsphere.shardingproxy.transport.common.packet.command.CommandResponsePackets;
 import org.apache.shardingsphere.shardingproxy.transport.common.packet.generic.DatabaseFailurePacket;
 import org.apache.shardingsphere.shardingproxy.transport.mysql.constant.MySQLServerErrorCode;
-import org.apache.shardingsphere.shardingproxy.transport.common.packet.command.CommandResponsePackets;
 
 import java.sql.SQLException;
 
@@ -40,24 +39,19 @@ public final class QueryBackendHandler implements TextProtocolBackendHandler {
     
     private final DatabaseCommunicationEngineFactory databaseCommunicationEngineFactory = DatabaseCommunicationEngineFactory.getInstance();
     
-    private final int sequenceId;
-    
     private final String sql;
     
     private final BackendConnection backendConnection;
-    
-    private final DatabaseType databaseType;
     
     private DatabaseCommunicationEngine databaseCommunicationEngine;
     
     @Override
     public CommandResponsePackets execute() {
         if (null == backendConnection.getLogicSchema()) {
-            MySQLServerErrorCode mySQLServerErrorCode = MySQLServerErrorCode.ER_NO_DB_ERROR;
-            return new CommandResponsePackets(new DatabaseFailurePacket(
-                1, mySQLServerErrorCode.getErrorCode(), mySQLServerErrorCode.getSqlState(), String.format(mySQLServerErrorCode.getErrorMessage(), "")));
+            MySQLServerErrorCode serverErrorCode = MySQLServerErrorCode.ER_NO_DB_ERROR;
+            return new CommandResponsePackets(new DatabaseFailurePacket(1, serverErrorCode.getErrorCode(), serverErrorCode.getSqlState(), String.format(serverErrorCode.getErrorMessage(), "")));
         }
-        databaseCommunicationEngine = databaseCommunicationEngineFactory.newTextProtocolInstance(backendConnection.getLogicSchema(), sequenceId, sql, backendConnection, databaseType);
+        databaseCommunicationEngine = databaseCommunicationEngineFactory.newTextProtocolInstance(backendConnection.getLogicSchema(), sql, backendConnection);
         return databaseCommunicationEngine.execute();
     }
     
