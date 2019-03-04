@@ -57,12 +57,13 @@ public final class InsertFiller implements SQLStatementFiller<InsertSegment> {
     @Override
     public void fill(final InsertSegment sqlSegment, final SQLStatement sqlStatement, final String sql, final ShardingRule shardingRule, final ShardingTableMetaData shardingTableMetaData) {
         InsertStatement insertStatement = (InsertStatement) sqlStatement;
-        insertStatement.getUpdateTables().put(insertStatement.getTables().getSingleTableName(), insertStatement.getTables().getSingleTableName());
+        insertStatement.getUpdateTableAlias().put(insertStatement.getTables().getSingleTableName(), insertStatement.getTables().getSingleTableName());
         createColumn(sqlSegment, insertStatement, shardingRule, shardingTableMetaData);
         createValue(sqlSegment, insertStatement, sql, shardingRule, shardingTableMetaData);
         insertStatement.setColumnsListLastIndex(sqlSegment.getColumnsListLastIndex());
         insertStatement.setInsertValuesListLastIndex(sqlSegment.getInsertValuesListLastIndex());
-        insertStatement.getSQLTokens().add(new InsertValuesToken(sqlSegment.getInsertValueStartIndex(), insertStatement.getTables().getSingleTableName()));
+        insertStatement.getSQLTokens().add(
+                new InsertValuesToken(sqlSegment.getInsertValueStartIndex(), DefaultKeyword.VALUES == sqlSegment.getValuesList().get(0).getType() ? DefaultKeyword.VALUES : DefaultKeyword.SET));
         processGeneratedKey(shardingRule, insertStatement);
         processDuplicateKey(shardingRule, sqlSegment, sqlStatement.getTables().getSingleTableName());
     }
@@ -136,7 +137,7 @@ public final class InsertFiller implements SQLStatementFiller<InsertSegment> {
             for (CommonExpressionSegment commonExpressionSegment : each.getValues()) {
                 Column column = iterator.next();
                 boolean shardingColumn = shardingRule.isShardingColumn(column);
-                SQLExpression sqlExpression = orConditionFiller.buildExpression(commonExpressionSegment, sql).get();
+                SQLExpression sqlExpression = commonExpressionSegment.convertToSQLExpression(sql).get();
                 insertValue.getColumnValues().add(sqlExpression);
                 if (shardingColumn) {
                     if (!(-1 < commonExpressionSegment.getPlaceholderIndex() || null != commonExpressionSegment.getValue() || commonExpressionSegment.isText())) {
@@ -150,7 +151,7 @@ public final class InsertFiller implements SQLStatementFiller<InsertSegment> {
                 index++;
             }
             insertStatement.setParametersIndex(parameterIndex);
-            insertStatement.getConditions().getOrCondition().getAndConditions().add(andCondition);
+            insertStatement.getRouteConditions().getOrCondition().getAndConditions().add(andCondition);
         }
     }
     

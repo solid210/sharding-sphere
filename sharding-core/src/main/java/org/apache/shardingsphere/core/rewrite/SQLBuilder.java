@@ -19,8 +19,7 @@ package org.apache.shardingsphere.core.rewrite;
 
 import com.google.common.base.Strings;
 import org.apache.shardingsphere.core.metadata.datasource.ShardingDataSourceMetaData;
-import org.apache.shardingsphere.core.optimizer.condition.ShardingCondition;
-import org.apache.shardingsphere.core.optimizer.insert.InsertShardingCondition;
+import org.apache.shardingsphere.core.parsing.parser.token.InsertValuesToken.InsertColumnValue;
 import org.apache.shardingsphere.core.rewrite.placeholder.IndexPlaceholder;
 import org.apache.shardingsphere.core.rewrite.placeholder.InsertValuesPlaceholder;
 import org.apache.shardingsphere.core.rewrite.placeholder.SchemaPlaceholder;
@@ -110,13 +109,12 @@ public final class SQLBuilder {
             } else if (each instanceof IndexPlaceholder) {
                 appendIndexPlaceholder((IndexPlaceholder) each, actualTableName, result);
             } else if (each instanceof InsertValuesPlaceholder) {
-                appendInsertValuesPlaceholder(tableUnit, insertParameters, (InsertValuesPlaceholder) each, result);
+                appendInsertValuesPlaceholder(tableUnit, (InsertValuesPlaceholder) each, insertParameters, result);
             } else {
                 result.append(each);
             }
         }
-        List<List<Object>> parameterSets = insertParameters.isEmpty() ? new ArrayList<>(Collections.singleton(parameters)) : new ArrayList<>(Collections.singleton(insertParameters));
-        return new SQLUnit(result.toString(), parameterSets);
+        return insertParameters.isEmpty() ? new SQLUnit(result.toString(), new ArrayList<>(parameters)) : new SQLUnit(result.toString(), insertParameters);
     }
     
     /**
@@ -136,6 +134,28 @@ public final class SQLBuilder {
             }
         }
         return result.toString();
+    }
+    
+    /**
+     * Convert to SQL unit.
+     *
+     * @return SQL unit
+     */
+    public SQLUnit toSQL() {
+        StringBuilder result = new StringBuilder();
+        List<Object> insertParameters = new LinkedList<>();
+        for (Object each : segments) {
+            if (!(each instanceof ShardingPlaceholder)) {
+                result.append(each);
+                continue;
+            }
+            if (each instanceof InsertValuesPlaceholder) {
+                appendInsertValuesPlaceholder(null, (InsertValuesPlaceholder) each, insertParameters, result);
+            } else {
+                result.append(each);
+            }
+        }
+        return insertParameters.isEmpty() ? new SQLUnit(result.toString(), parameters) : new SQLUnit(result.toString(), insertParameters);
     }
     
     private void appendTablePlaceholder(final TablePlaceholder tablePlaceholder, final String actualTableName, final StringBuilder stringBuilder) {
@@ -161,32 +181,30 @@ public final class SQLBuilder {
         }
     }
     
-    private void appendInsertValuesPlaceholder(final TableUnit tableUnit, final List<Object> parameters, final InsertValuesPlaceholder insertValuesPlaceholder, final StringBuilder stringBuilder) {
-        List<String> expressions = new LinkedList<>();
-        for (ShardingCondition each : insertValuesPlaceholder.getShardingConditions().getShardingConditions()) {
-            processInsertShardingCondition(tableUnit, (InsertShardingCondition) each, expressions, parameters);
-        }
-        int count = 0;
-        for (String each : expressions) {
-            if (0 != count) {
-                stringBuilder.append(", ");
+    private void appendInsertValuesPlaceholder(final TableUnit tableUnit, 
+                                               final InsertValuesPlaceholder insertValuesPlaceholder, final List<Object> insertParameters, final StringBuilder stringBuilder) {
+        for (InsertColumnValue each : insertValuesPlaceholder.getColumnValues()) {
+            if (isToAppendInsertColumnValue(tableUnit, each)) {
+                appendInsertColumnValue(each, insertParameters, stringBuilder);
             }
-            stringBuilder.append(each);
-            count++;
         }
+        stringBuilder.delete(stringBuilder.length() - 2, stringBuilder.length());
     }
     
-    private void processInsertShardingCondition(final TableUnit tableUnit, final InsertShardingCondition shardingCondition, final List<String> expressions, final List<Object> parameters) {
-        for (DataNode each : shardingCondition.getDataNodes()) {
-            if (each.getDataSourceName().equals(tableUnit.getDataSourceName()) && each.getTableName().equals(tableUnit.getRoutingTables().iterator().next().getActualTableName())) {
-                expressions.add(shardingCondition.getInsertValueExpression());
-                parameters.addAll(shardingCondition.getParameters());
-                return;
+    private void appendInsertColumnValue(final InsertColumnValue insertColumnValue, final List<Object> insertParameters, final StringBuilder stringBuilder) {
+        stringBuilder.append(insertColumnValue).append(", ");
+        insertParameters.addAll(insertColumnValue.getParameters());
+    }
+    
+    private boolean isToAppendInsertColumnValue(final TableUnit tableUnit, final InsertColumnValue insertColumnValue) {
+        if (insertColumnValue.getDataNodes().isEmpty() || null == tableUnit) {
+            return true;
+        }
+        for (DataNode each : insertColumnValue.getDataNodes()) {
+            if (tableUnit.getRoutingTable(each.getDataSourceName(), each.getTableName()).isPresent()) {
+                return true;
             }
         }
-        if (shardingCondition.getDataNodes().isEmpty()) {
-            expressions.add(shardingCondition.getInsertValueExpression());
-            parameters.addAll(shardingCondition.getParameters());
-        }
+        return false;
     }
 }
